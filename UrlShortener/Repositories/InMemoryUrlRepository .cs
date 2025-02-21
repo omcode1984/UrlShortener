@@ -1,5 +1,5 @@
 ﻿using System.Collections.Generic;
-using UrlShortener.Data;
+using UrlShortener.Models;
 using UrlShortener.Repositories.Interfaces;
 using URLShortener.Controllers;
 

@@ -1,4 +1,4 @@
-﻿namespace UrlShortener.Data
+﻿namespace UrlShortener.Models
 {
     public class UrlMapping
     {

@@ -1,8 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using System;
-using UrlShortener.Data;
 using UrlShortener.Models;
-using UrlShortener.Repositories.Interfaces;
+using UrlShortener.Services.Interface;
 
 namespace URLShortener.Controllers
 {
@@ -10,12 +8,13 @@ namespace URLShortener.Controllers
     [ApiController]
     public class UrlShortenerController : ControllerBase
     {
-        private readonly IUrlRepository _urlRepository;
-        private const string BaseUrl = "http://localhost:5000/";
+        private readonly IUrlShortenerService _urlShortenerService;
+        private readonly ILogger<UrlShortenerController> _logger;
 
-        public UrlShortenerController(IUrlRepository urlRepository)
+        public UrlShortenerController(IUrlShortenerService urlShortenerService, ILogger<UrlShortenerController> logger)
         {
-            _urlRepository = urlRepository ?? throw new ArgumentNullException(nameof(urlRepository));
+            _urlShortenerService = urlShortenerService ?? throw new ArgumentNullException(nameof(urlShortenerService));
+            _logger = logger;
         }
 
         // POST: api/shorten
@@ -24,24 +23,23 @@ namespace URLShortener.Controllers
         {
             if (request == null || !IsValidUrl(request.OriginalUrl))
             {
+                _logger.LogWarning("Invalid URL received for shortening.");
                 return BadRequest("Invalid URL.");
             }
 
-            var shortId = _urlRepository.GenerateShortId();
-            var urlMapping = CreateUrlMapping(request.OriginalUrl, shortId);
+            var shortenUrl = _urlShortenerService.ShortenUrl(request);
 
-            _urlRepository.AddUrlMapping(shortId, urlMapping);
-
-            return Ok(CreateUrlResponse(shortId));
+            return Ok(shortenUrl);
         }
 
         // GET: api/{shortId}
         [HttpGet("{shortId}")]
         public IActionResult ResolveUrl(string shortId)
         {
-            var urlMapping = _urlRepository.GetUrlMapping(shortId);
+            var urlMapping = _urlShortenerService.GetUrlMapping(shortId);
             if (urlMapping == null)
             {
+                _logger.LogWarning($"URL not found for short ID: {shortId}");
                 return NotFound("URL not found.");
             }
 
@@ -52,29 +50,6 @@ namespace URLShortener.Controllers
         private bool IsValidUrl(string url)
         {
             return Uri.IsWellFormedUriString(url, UriKind.Absolute);
-        }
-
-        // Helper method to generate a random short ID
-       
-
-        // Helper method to create a URL mapping object
-        private UrlMapping CreateUrlMapping(string originalUrl, string shortId)
-        {
-            return new UrlMapping
-            {
-                OriginalUrl = originalUrl,
-                ShortId = shortId
-            };
-        }
-
-        // Helper method to create a URL response with the shortened URL
-        private UrlResponse CreateUrlResponse(string shortId)
-        {
-            return new UrlResponse
-            {
-                ShortenedUrl = $"{BaseUrl}{shortId}",
-                ShortId = shortId
-            };
         }
     }
 }

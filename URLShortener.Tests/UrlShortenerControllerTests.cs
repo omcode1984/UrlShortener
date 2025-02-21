@@ -3,23 +3,31 @@ using System;
 using URLShortener.Controllers;
 using Xunit;
 using Microsoft.AspNetCore.Mvc;
-using UrlShortener.Data;
 using UrlShortener.Models;
 using UrlShortener.Repositories.Interfaces;
 using System.Xml.Serialization;
 using Microsoft.AspNetCore.Http.HttpResults;
+using UrlShortener.Services.Interface;
+using MyUrlShortenerApp.Services;
+using Castle.Core.Logging;
+using Microsoft.Extensions.Logging;
 
 namespace URLShortener.Tests
 {
     public class UrlShortenerControllerTests
     {
         private readonly Mock<IUrlRepository> _mockUrlRepository;
+        private readonly Mock<ILogger<UrlShortenerController>> _mockLogger;
         private readonly UrlShortenerController _controller;
+        private readonly IUrlShortenerService _urlShortenerService;
 
         public UrlShortenerControllerTests()
         {
             _mockUrlRepository = new Mock<IUrlRepository>();
-            _controller = new UrlShortenerController(_mockUrlRepository.Object);
+            _mockLogger = new Mock<ILogger<UrlShortenerController>>();
+            
+            _urlShortenerService = new UrlShortenerService(_mockUrlRepository.Object);
+            _controller = new UrlShortenerController(_urlShortenerService, _mockLogger.Object);
         }
 
         // Test for valid URL shortening
