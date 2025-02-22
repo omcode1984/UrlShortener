@@ -20,6 +20,7 @@ namespace MyUrlShortenerApp.Services
         public UrlResponse ShortenUrl(UrlRequest request)
         {
             var shortId = GenerateShortId();
+
             var urlMapping = CreateUrlMapping(request.OriginalUrl, shortId);
 
             _urlRepository.AddUrlMapping(shortId, urlMapping);
@@ -35,7 +36,7 @@ namespace MyUrlShortenerApp.Services
         {
             if (_cacheService.Exists(shortId))
             {
-                var origianlUrl= _cacheService.Get(shortId);
+                var origianlUrl = _cacheService.Get(shortId);
                 return new UrlMapping { OriginalUrl = origianlUrl, ShortId = shortId };
             }
 
