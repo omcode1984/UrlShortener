@@ -31,12 +31,7 @@ namespace UrlShortener.Repositories
             _urlMappings.TryGetValue(shortId, out var urlMapping);            
             return urlMapping;
         }
-        public string GenerateShortId()
-        {
-            var random = new Random();
-            const string chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-            return new string(Enumerable.Range(0, 6).Select(_ => chars[random.Next(chars.Length)]).ToArray());
-        }
+        
     }
 
 }

@@ -11,6 +11,7 @@ using UrlShortener.Services.Interface;
 using MyUrlShortenerApp.Services;
 using Castle.Core.Logging;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace URLShortener.Tests
 {
@@ -20,13 +21,16 @@ namespace URLShortener.Tests
         private readonly Mock<ILogger<UrlShortenerController>> _mockLogger;
         private readonly UrlShortenerController _controller;
         private readonly IUrlShortenerService _urlShortenerService;
+        private readonly Mock<InMemoryCacheService> _mockCacheService;
 
         public UrlShortenerControllerTests()
         {
             _mockUrlRepository = new Mock<IUrlRepository>();
             _mockLogger = new Mock<ILogger<UrlShortenerController>>();
-            
-            _urlShortenerService = new UrlShortenerService(_mockUrlRepository.Object);
+            var memoryCache = new MemoryCache(new MemoryCacheOptions());
+            _mockCacheService = new Mock<InMemoryCacheService>(memoryCache);
+
+            _urlShortenerService = new UrlShortenerService(_mockUrlRepository.Object, _mockCacheService.Object);
             _controller = new UrlShortenerController(_urlShortenerService, _mockLogger.Object);
         }
 
@@ -37,19 +41,35 @@ namespace URLShortener.Tests
             // Arrange
             var originalUrl = "https://www.example.com";
             var urlRequest = CreateValidUrlRequest(originalUrl);
-            var expectedShortId = "abc123";
-            SetupUrlRepositoryToReturnShortenedUrl(originalUrl, expectedShortId);
-            SetupUrlRepositoryToReturnShortenedId(expectedShortId);
-
+                       
             // Act
             var result = _controller.ShortenUrl(urlRequest) as OkObjectResult;
 
             // Assert
+            UrlResponse urlDetails = result.Value as UrlResponse;
+            Assert.NotNull(urlDetails);
+            Assert.Equal(result.StatusCode, 200);
+            Assert.NotEmpty(urlDetails.ShortenedUrl);
             _mockUrlRepository.Verify(repo => repo.AddUrlMapping(It.IsAny<string>(), It.IsAny<UrlMapping>()), Times.Once);
-            AssertShortenedUrlResponse(result, originalUrl, expectedShortId);
            
         }
 
+        [Fact]
+        public void ResolveUrl_ShouldReturnUrl_FromCache()
+        {
+            // Arrange
+            string shortId = "abc123";
+            string originalUrl = "https://example.com";
+            _mockCacheService.Setup(c => c.Get(shortId)).Returns(originalUrl);
+            _mockCacheService.Setup(c => c.Exists(shortId)).Returns(true);
+
+            // Act
+            var result = _urlShortenerService.GetUrlMapping(shortId);
+
+            // Assert
+            Assert.Equal(originalUrl, result.OriginalUrl);
+            _mockUrlRepository.Verify(r => r.GetUrlMapping(It.IsAny<string>()), Times.Never);
+        }
         // Test for invalid URL shortening
         [Fact]
         public void ShortenUrl_WhenGivenInvalidUrl_ReturnsBadRequest()
@@ -101,17 +121,6 @@ namespace URLShortener.Tests
             return new UrlRequest { OriginalUrl = url };
         }
 
-        // Helper method to set up the repository to return a valid mapping
-        private void SetupUrlRepositoryToReturnShortenedUrl(string originalUrl, string shortId)
-        {
-            var urlMapping = new UrlMapping { OriginalUrl = originalUrl, ShortId = shortId };
-            _mockUrlRepository.Setup(repo => repo.AddUrlMapping(shortId, urlMapping)).Verifiable();
-        }
-        private void SetupUrlRepositoryToReturnShortenedId(string shortId)
-        {
-            _mockUrlRepository.Setup(repo => repo.GenerateShortId()).Returns(shortId);
-        }
-
         // Helper method to set up the repository to return the original URL for a short ID
         private void SetupUrlRepositoryToReturnOriginalUrl(string shortId, string originalUrl)
         {
@@ -123,15 +132,6 @@ namespace URLShortener.Tests
         private void SetupUrlRepositoryToReturnNullForShortId(string shortId)
         {
             _mockUrlRepository.Setup(repo => repo.GetUrlMapping(shortId)).Returns((UrlMapping)null);
-        }
-
-        // Helper method to assert the shortened URL response
-        private void AssertShortenedUrlResponse(OkObjectResult result, string originalUrl, string expectedShortId)
-        {
-            Assert.NotNull(result);
-            var response = result.Value as UrlResponse;
-            Assert.Equal($"http://localhost:5000/{expectedShortId}", response.ShortenedUrl);
-            Assert.Equal(expectedShortId, response.ShortId);
         }
 
         // Helper method to assert the BadRequest response

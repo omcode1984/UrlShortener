@@ -21,35 +21,43 @@ namespace URLShortener.Controllers
         [HttpPost("shorten")]
         public IActionResult ShortenUrl([FromBody] UrlRequest request)
         {
-            if (request == null || !IsValidUrl(request.OriginalUrl))
+            try
             {
-                _logger.LogWarning("Invalid URL received for shortening.");
-                return BadRequest("Invalid URL.");
+                var shortenUrl = _urlShortenerService.ShortenUrl(request);
+
+                return Ok(shortenUrl);
             }
-
-            var shortenUrl = _urlShortenerService.ShortenUrl(request);
-
-            return Ok(shortenUrl);
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, "Unexpected error: {Message}", ex.Message);
+                return StatusCode(500, new { Message = "An unexpected error occurred." });
+            }
         }
 
         // GET: api/{shortId}
         [HttpGet("{shortId}")]
         public IActionResult ResolveUrl(string shortId)
         {
-            var urlMapping = _urlShortenerService.GetUrlMapping(shortId);
-            if (urlMapping == null)
+            try
             {
-                _logger.LogWarning($"URL not found for short ID: {shortId}");
-                return NotFound("URL not found.");
+                var urlMapping = _urlShortenerService.GetUrlMapping(shortId);
+                if (urlMapping == null)
+                {
+                    _logger.LogWarning($"URL not found for short ID: {shortId}");
+                    return NotFound("URL not found.");
+                }
+
+                return Ok(urlMapping.OriginalUrl);
             }
-
-            return Ok(urlMapping.OriginalUrl);
-        }
-
-        // Helper method to validate the URL
-        private bool IsValidUrl(string url)
-        {
-            return Uri.IsWellFormedUriString(url, UriKind.Absolute);
+            catch (KeyNotFoundException ex)
+            {
+                return NotFound(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogCritical(ex, "Unexpected error: {Message}", ex.Message);
+                return StatusCode(500, new { Message = "An unexpected error occurred." });
+            }
         }
     }
 }
